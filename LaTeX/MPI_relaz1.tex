@@ -1,0 +1,69 @@
+%\documentclass[12pt]{article}
+
+%\usepackage[italian]{babel}
+%\usepackage{listings}
+
+
+%\begin{document}
+
+%\title{\sc Esercizio 1}
+
+%\maketitle 
+
+\chapter*{Esercizio 1}
+
+%dovrebbe essere un abstract (riassunto) nel relaz_finale
+\section*{Obiettivi dell'esercitazione}
+Questo esercizio \`e una introduzione sull'uso di MPI (Message Passing Interfaces), una libreria che implementa IPC (Inter-Process Communications) tra processi paralleli che girano all'interno di un cluster.
+
+%non so se dividerlo cosi come si vede nei commenti o meno
+\section*{Contenuto del $1^\circ$ esercizio}
+\subsection*{Richiesta 1}
+Eseguire il codice sul cluster IMATI, descrivere, in maniera sintetica, la struttura ed il comportamento atteso e quello visibile eseguendo il codice. In questa descrizione porre particolare attenzione all'individuazione della modalit\`a di interazione tra processi e al codice MPI presente nel programma.
+
+\subsection*{Richiesta 2}
+Modificare il codice in modo tale che sia il processo con identificatore pi\`u alto a funzionare da “console” e l'anello dei processi sia percorso dal processo con identificatore pi\`u alto al processo “0” e ripetere il passo 1 con questa versione.\\
+
+
+
+\section*{Svolgimento}
+\subsection*{Prima richiesta}
+Segue codice sorgente utilizzato:
+%\newpage
+\lstinputlisting[language=C, breaklines=true, numbers=left]{skringMOD.c}
+
+
+ \subsection*{Note sulla prima richiesta}
+L'esercizio richiede inizialmente di eseguire il codice sul cluster IMATI. Il programma permette a \emph{n} processi di comunicare tra loro simulando una struttura ad anello: un messaggio, quindi, verr\`a inviato un numero di volte prestabilito a ciascun processo.
+L'intero codice \'e eseguito da ciascun processore che, appena entrato nel \emph{main} inizializza l'ambiente MPI e identifica il proprio \emph{rank} all'interno di MPI\_COMM\_WORLD attraverso la funzione \emph{MPI\_Comm\_rank()}. 
+Successivamente, dopo aver ottenuto anche il numero totale di processi attivi (\emph{MPI\_Comm\_size()}), esegue la sua porzione di codice.
+Il processo con \emph{rank} = 1, che chiameremo console, ha il compito di interrogare l'utente e ottenere il numero di giri da effettuare attorno all'anello, cio\`e il numero di volte che ciascun processo invier\`a e ricever\`a il messaggio.
+Mentre il processo console esegue le inizializzazioni, i rimanenti \emph{size-1} lavoratori restano bloccati in attesa di ricevere un messaggio (\emph{MPI\_Recv()}). La console allora invier\`a il messaggio al processo con \emph{rank = 1}, il quale lo invier\`a al processo successivo (\emph{rank = 2)} e cos\`i via in ordine crescente; l'ultimo processo (\emph{rank = n-1)} ha il compito di far tornare il messaggio alla console, che si occuper\`a di decrementare il numero di giri attorno all'anello ancora da effettuare. \\
+Il lavoro termina con la ricezione dell'ultimo messaggio da parte della console.
+
+\newpage
+
+\subsection*{Seconda richiesta}
+Segue codice sorgente utilizzato:
+\lstinputlisting[language=C, breaklines=true, numbers=left]{skringMOD3.c}
+
+
+\subsection*{}
+
+
+\subsection*{Note sulla seconda richiesta}
+La seconda richiesta indicava di fare scorrere il messaggio nell'anello in senso contrario, ossia dal processo \emph{n-1} al processo \emph{0}. \\
+La soluzione pi\`u intuitiva, ossia quella di modificare i ruoli definiti alla riga di codice 48:
+\begin{verbatim}
+if ( rank == (size - 1) )
+\end{verbatim}
+non \`e stata possibile, in quanto l'attuale versione di MPI consente \textbf{solo al processo master} di leggere da \textit{stdin} (funzioni \emph{scanf, getc, sscanf, gets}).    
+
+%\newpage
+
+Ci sono varie soluzioni per ovviare al problema. La migliore sarebbe far leggere da file, al processo con \emph{rank = n-1}, il numero di giri da effettuare sul ring. Leggendo tramite \textit{fscanf} (non \'e \emph{standard input}), il nuovo programma console pu\'o acquisire il dato nascondendo l'inconveniente. Abbiamo, tuttavia, scartato questa soluzione a causa della poca ``interattivit\`a'' che il metodo consentirebbe; inoltre un approccio del genere, implicherebbe accessi a disco, che su un'architettura distribuita potrebbero avere ripercussioni negative, quali rallentamento del runtime e tempi lunghi nel seek del file. Questa ipotesi \`e stata fatta dopo aver lanciato il comando \emph{cat /etc/fstab}, che ha mostrato un filesystem \textbf{non} distribuito sul cluster, ma un normale ext3. \\
+L'approccio scelto trascura nel dettaglio requisiti, ma ottiene i risultati richiesti. Abbiamo, infatti lasciato invariata l'acquisizione del messaggio da parte del processo con \emph{rank = 0}, tramite lettura \emph{stdin}, invertito i processi definiti come \emph{next} e \emph{from} e inviato tramite \emph{MPI\_Recv()} il numero al processo \emph{n-1}, prima di iniziare la vera e propria comunicazione sull'anello. \\
+Il resto del programma, quindi, rimane invariato, e l'anello verr\`a percorso in senso opposto al precedente, ovvero dal rank maggiore a quello nullo.
+
+
+%\end{document}
